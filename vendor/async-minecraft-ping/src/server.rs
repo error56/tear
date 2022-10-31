@@ -40,7 +40,8 @@ pub struct ServerVersion {
     pub name: String,
 
     /// The server's ServerListPing protocol version.
-    pub protocol: u32,
+    /// Have to be i32 cause of servers sending -1 as a protocol version
+    pub protocol: i32,
 }
 
 /// Contains information about a player.
@@ -69,6 +70,14 @@ pub struct ServerPlayers {
     pub sample: Option<Vec<ServerPlayer>>,
 }
 
+/// Represents click event of component
+#[allow(unused)]
+#[derive(Debug, Deserialize)]
+pub struct ServerDescriptionClickEvent {
+    action: Option<String>,
+    value: Option<String>
+}
+
 /// Represents every component of description's `extra` field.
 #[allow(unused)]
 #[derive(Debug, Deserialize)]
@@ -80,8 +89,28 @@ pub struct ServerDescriptionComponent {
     pub obfuscated: Option<bool>,
     pub font: Option<String>,
 
+    // Used only on FML servers
+    #[serde(rename = "clickEvent")]
+    pub click_event: Option<ServerDescriptionClickEvent>,
+
     pub color: Option<String>,
     pub text: String
+}
+
+impl Default for ServerDescriptionComponent {
+    fn default() -> Self {
+        ServerDescriptionComponent { 
+            bold: None,
+            italic: None, 
+            underlined: None, 
+            strikethrough: None,
+            obfuscated: None,
+            font: None, 
+            click_event: None,
+            color: None,
+            text: "".to_owned()
+        }
+    }
 }
 
 /// Contains the server's MOTD.
@@ -222,8 +251,8 @@ impl StatusConnection {
             .read_packet_with_timeout(self.timeout.clone())
             .await?;
 
-        let status: StatusResponse = serde_json::from_str(&response.body)
-            .map_err(|_| ServerError::InvalidJson(response.body))?;
+        let status: StatusResponse = serde_json::from_str(&response.body).unwrap()
+            ;//.map_err(|_| ServerError::InvalidJson(response.body))?;
 
         Ok(PingConnection {
             stream: self.stream,
