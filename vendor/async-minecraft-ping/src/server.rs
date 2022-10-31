@@ -251,8 +251,8 @@ impl StatusConnection {
             .read_packet_with_timeout(self.timeout.clone())
             .await?;
 
-        let status: StatusResponse = serde_json::from_str(&response.body).unwrap()
-            ;//.map_err(|_| ServerError::InvalidJson(response.body))?;
+        let status: StatusResponse = serde_json::from_str(&response.body)
+            .map_err(|_| ServerError::InvalidJson(response.body))?;
 
         Ok(PingConnection {
             stream: self.stream,
