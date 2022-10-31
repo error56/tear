@@ -249,23 +249,12 @@ impl Server {
 async fn main() -> Result<(), ServerError> {
     let mut servers = vec![];
 
-    /*servers.push(Server {
-        address: "130.61.54.151".to_owned(),
-        port: Some(25565),
-        minecraft_style_motd: "".to_owned(),
-        html_motd: "".to_owned(),
-        clean_motd: "".to_owned()
-    });*/
     let mut s = Server {
-        address: "51.83.170.185".to_owned(), //"80.91.223.241".to_owned(),
-        port: Some(36325),                   //(25539),
+        address: "51.83.170.185".to_owned(),
+        port: Some(36325),
         html_motd: "".to_owned(),
         clean_motd: "".to_owned(),
     };
-
-    s.process_legacy_motd("§cCzerwony bez pogrubienia\n§lCzerwony z pogrubieniem\n§mCzerwony z czyms tam\n§6Zolty\n§rZoltyBezNiczego\n§3JkaisInnyKolor\n§lPogrubienie");
-
-    unimplemented!();
 
     servers.push(&mut s);
 
@@ -280,13 +269,12 @@ async fn main() -> Result<(), ServerError> {
         match response.description {
             ServerDescription::Object {
                 text: _text,
-                extra: components,
-                ..
+                extra: components
             } => {
                 server.process_motd(&components);
             }
             ServerDescription::Plain(string) => {
-                println!("{}", string);
+                server.process_legacy_motd(&string);
             }
         }
     }
