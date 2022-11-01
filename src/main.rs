@@ -1,4 +1,5 @@
 extern crate lazy_static;
+extern crate resolve;
 
 use std::{collections::HashMap, path::Component};
 
@@ -6,6 +7,8 @@ use async_minecraft_ping::{
     ConnectionConfig, ServerDescription, ServerDescriptionComponent, ServerError,
 };
 use lazy_static::lazy_static;
+use resolve::{DnsConfig, DnsResolver};
+use resolve::record::Srv;
 
 lazy_static! {
     static ref COLOR_MAP: HashMap<&'static str, &'static str> = [
@@ -59,6 +62,44 @@ struct Server {
     port: Option<u16>,
     clean_motd: String,
     html_motd: String,
+}
+
+enum SrvOrStr<'a> {
+    Srv(resolve::record::Srv),
+    Str(&'a str),
+}
+
+fn resolve_srv(address: &str) -> SrvOrStr {
+    let config = match DnsConfig::load_default() {
+        Ok(config) => config,
+        Err(e) => {
+            println!("failed to load system configuration: {}", e);
+            return SrvOrStr::Str("failed to load system configuration");
+        }
+    };
+
+    let resolver = match DnsResolver::new(config) {
+        Ok(resolver) => resolver,
+        Err(e) => {
+            println!("failed to create DNS resolver: {}", e);
+            return SrvOrStr::Str("failed to create DNS resolver");
+        }
+    };
+
+    let name = format!("{}.{}.{}", "_minecraft", "_tcp", address);
+
+    match resolver.resolve_record::<Srv>(&name) {
+        Ok(records) => {
+            if records.len() > 0 {
+                return SrvOrStr::Srv(records[0].clone());
+            }
+            return SrvOrStr::Str("no SRV records");
+        }
+        Err(e) => {
+            println!("{}", e);
+            return SrvOrStr::Str("failed to create DNS resolver");
+        }
+    }
 }
 
 impl Server {
@@ -249,9 +290,18 @@ impl Server {
 async fn main() -> Result<(), ServerError> {
     let mut servers = vec![];
 
+    let mut address = "localhost".to_owned();
+    let mut port = 25565;
+
+    let srv = resolve_srv(&address);
+    if let SrvOrStr::Srv(srv) = srv {
+        address = srv.target.to_string().clone();
+        port = srv.port;
+    }
+    
     let mut s = Server {
-        address: "51.83.170.185".to_owned(),
-        port: Some(36325),
+        address: address.to_owned(),
+        port: Some(port),
         html_motd: "".to_owned(),
         clean_motd: "".to_owned(),
     };
