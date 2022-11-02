@@ -64,25 +64,18 @@ struct Server {
     html_motd: String,
 }
 
-enum SrvOrStr<'a> {
-    Srv(resolve::record::Srv),
-    Str(&'a str),
-}
-
-fn resolve_srv(address: &str) -> SrvOrStr {
+fn resolve_srv(address: &str) -> Result<resolve::record::Srv, String> {
     let config = match DnsConfig::load_default() {
         Ok(config) => config,
         Err(e) => {
-            println!("failed to load system configuration: {}", e);
-            return SrvOrStr::Str("failed to load system configuration");
+            return Err(e.to_string());
         }
     };
 
     let resolver = match DnsResolver::new(config) {
         Ok(resolver) => resolver,
         Err(e) => {
-            println!("failed to create DNS resolver: {}", e);
-            return SrvOrStr::Str("failed to create DNS resolver");
+            return Err(e.to_string());
         }
     };
 
@@ -91,13 +84,13 @@ fn resolve_srv(address: &str) -> SrvOrStr {
     match resolver.resolve_record::<Srv>(&name) {
         Ok(records) => {
             if records.len() > 0 {
-                return SrvOrStr::Srv(records[0].clone());
+                return Ok(records[0].clone());
             }
-            return SrvOrStr::Str("no SRV records");
+            return Err("no SRV records".to_string());
         }
         Err(e) => {
             println!("{}", e);
-            return SrvOrStr::Str("failed to create DNS resolver");
+            return Err(e.to_string());
         }
     }
 }
@@ -294,9 +287,12 @@ async fn main() -> Result<(), ServerError> {
     let mut port = 25565;
 
     let srv = resolve_srv(&address);
-    if let SrvOrStr::Srv(srv) = srv {
-        address = srv.target.to_string().clone();
-        port = srv.port;
+    match srv {
+        Ok(v) => {
+            address = v.target.to_string().clone();
+            port = v.port;
+        }
+        Err(e) => println!("Error occured while resolving SRV: {e:?}"),
     }
     
     let mut s = Server {
