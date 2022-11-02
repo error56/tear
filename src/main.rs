@@ -2,6 +2,7 @@ extern crate lazy_static;
 extern crate resolve;
 
 use std::{collections::HashMap, path::Component};
+use std::io::{Error, ErrorKind};
 
 use async_minecraft_ping::{
     ConnectionConfig, ServerDescription, ServerDescriptionComponent, ServerError,
@@ -64,20 +65,9 @@ struct Server {
     html_motd: String,
 }
 
-fn resolve_srv(address: &str) -> Result<resolve::record::Srv, String> {
-    let config = match DnsConfig::load_default() {
-        Ok(config) => config,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
-
-    let resolver = match DnsResolver::new(config) {
-        Ok(resolver) => resolver,
-        Err(e) => {
-            return Err(e.to_string());
-        }
-    };
+fn resolve_srv(address: &str) -> Result<resolve::record::Srv, Error> {
+    let config = DnsConfig::load_default()?;
+    let resolver = DnsResolver::new(config)?;
 
     let name = format!("{}.{}.{}", "_minecraft", "_tcp", address);
 
@@ -86,11 +76,10 @@ fn resolve_srv(address: &str) -> Result<resolve::record::Srv, String> {
             if records.len() > 0 {
                 return Ok(records[0].clone());
             }
-            return Err("no SRV records".to_string());
+            return Err(Error::new(ErrorKind::Other, "No SRV records found"));
         }
         Err(e) => {
-            println!("{}", e);
-            return Err(e.to_string());
+            return Err(e);
         }
     }
 }
@@ -283,7 +272,7 @@ impl Server {
 async fn main() -> Result<(), ServerError> {
     let mut servers = vec![];
 
-    let mut address = "localhost".to_owned();
+    let mut address = "burncraft.pl".to_owned();
     let mut port = 25565;
 
     let srv = resolve_srv(&address);
