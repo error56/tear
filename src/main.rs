@@ -71,17 +71,13 @@ fn resolve_srv(address: &str) -> Result<resolve::record::Srv, Error> {
 
     let name = format!("{}.{}.{}", "_minecraft", "_tcp", address);
 
-    match resolver.resolve_record::<Srv>(&name) {
-        Ok(records) => {
-            if records.len() > 0 {
-                return Ok(records[0].clone());
-            }
-            return Err(Error::new(ErrorKind::Other, "No SRV records found"));
-        }
-        Err(e) => {
-            return Err(e);
-        }
+    let records = resolver.resolve_record::<Srv>(&name)?;
+
+    if records.len() < 0 {
+        return Err(Error::new(ErrorKind::Other, "No SRV records found"));
     }
+    
+    Ok(records[0].clone())
 }
 
 impl Server {
@@ -272,7 +268,7 @@ impl Server {
 async fn main() -> Result<(), ServerError> {
     let mut servers = vec![];
 
-    let mut address = "burncraft.pl".to_owned();
+    let mut address = "localhost".to_owned();
     let mut port = 25565;
 
     let srv = resolve_srv(&address);
