@@ -1,11 +1,15 @@
 extern crate lazy_static;
+extern crate resolve;
 
 use std::{collections::HashMap, path::Component};
+use std::io::{Error, ErrorKind};
 
 use async_minecraft_ping::{
     ConnectionConfig, ServerDescription, ServerDescriptionComponent, ServerError,
 };
 use lazy_static::lazy_static;
+use resolve::{DnsConfig, DnsResolver};
+use resolve::record::Srv;
 
 lazy_static! {
     static ref COLOR_MAP: HashMap<&'static str, &'static str> = [
@@ -59,6 +63,21 @@ struct Server {
     port: Option<u16>,
     clean_motd: String,
     html_motd: String,
+}
+
+fn resolve_srv(address: &str) -> Result<resolve::record::Srv, Error> {
+    let config = DnsConfig::load_default()?;
+    let resolver = DnsResolver::new(config)?;
+
+    let name = format!("{}.{}.{}", "_minecraft", "_tcp", address);
+
+    let records = resolver.resolve_record::<Srv>(&name)?;
+
+    if records.len() < 0 {
+        return Err(Error::new(ErrorKind::Other, "No SRV records found"));
+    }
+    
+    Ok(records[0].clone())
 }
 
 impl Server {
@@ -249,9 +268,21 @@ impl Server {
 async fn main() -> Result<(), ServerError> {
     let mut servers = vec![];
 
+    let mut address = "localhost".to_owned();
+    let mut port = 25565;
+
+    let srv = resolve_srv(&address);
+    match srv {
+        Ok(v) => {
+            address = v.target.to_string().clone();
+            port = v.port;
+        }
+        Err(e) => println!("Error occured while resolving SRV: {e:?}"),
+    }
+    
     let mut s = Server {
-        address: "51.83.170.185".to_owned(),
-        port: Some(36325),
+        address: address.to_owned(),
+        port: Some(port),
         html_motd: "".to_owned(),
         clean_motd: "".to_owned(),
     };
